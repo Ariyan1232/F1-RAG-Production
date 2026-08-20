@@ -1,3 +1,5 @@
+import os
+
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableParallel
@@ -13,11 +15,40 @@ from dotenv import load_dotenv
 import tempfile
 
 load_dotenv()
-embeddings_model = OpenAIEmbeddings(model="text-embedding-3-small")
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+
+embeddings_model = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
+llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0.2)
+
+KNOWLEDGE_BASE = """
+The 2023 Monaco Grand Prix was won by Max Verstappen, marking his 4th win 
+of the season. Fernando Alonso finished second, with Esteban Ocon completing 
+the podium in third...
+
+[more F1 content here]
+"""
+
+questions = [
+    "Who won the 2023 Monaco Grand Prix?",
+    "Who finished on the podium at the 2023 Monaco GP?",
+    "Who won the 2022 championship?",  # deliberately not in your KB, to test "I don't know"
+]
 
 def create_kb():
     '''Create a vector store from knowledge base documents.'''
 
+    persist_dir = "./chroma_db"
+
+    #Loads store on disk instead of rebuilding
+    if os.path.exists(persist_dir) and os.listdir(persist_dir):
+        print("Loading existing vector store from disk...")
+        vector_store = Chroma(
+            persist_directory=persist_dir,
+            embedding_function=embeddings_model,
+        )
+        return vector_store
+
+    print("Creating new vector store from knowledge base documents...")
     #split the knowledge base documents into chunks
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     doc = Document(page_content=KNOWLEDGE_BASE, 
@@ -29,7 +60,7 @@ def create_kb():
     vector_store = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings_model,
-        persist_directory=tempfile.mkdtemp(),
+        persist_directory="./chroma_db",
     )
     return vector_store
 
@@ -37,7 +68,6 @@ def demo_basic_rag():
 
     vector_store = create_kb()
     retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-    llm = init_chat_model(model="gpt-4o", temperature=0.2)
 
     #RAG Prompt Template
     prompt = ChatPromptTemplate.from_template(
