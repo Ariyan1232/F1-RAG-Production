@@ -76,6 +76,30 @@ def recursive_splitter():
     print(f"Chunk sizes: {[len(chunk) for chunk in chunks]}")
     print(f"\nFirst chunk:\n{chunks[0][:200]}\n")
 
+
+#def chunk_size_comparison():
+
+def overlap_importance():
+    text = " Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 10
+
+    #without overlap
+    no_overlap = RecursiveCharacterTextSplitter(chunk_size=50, chunk_overlap=0)
+
+    #with overlap
+    with_overlap = RecursiveCharacterTextSplitter(chunk_size=50, chunk_overlap=20)
+
+    chunks_no_overlap = no_overlap.split_text(text)
+    chunks_with_overlap = with_overlap.split_text(text)
+
+    print("Without overlap:")
+    print(f" Chunk 1 end: ... {chunks_no_overlap[0][-20:]}")
+    print(f" Chunk 2 start: {chunks_no_overlap[1][:20]} ...")
+
+    print("\nWith overlap:")
+    print(f" Chunk 1 end: ... {chunks_with_overlap[0][-20:]}")
+    print(f" Chunk 2 start: {chunks_with_overlap[1][:20]} ...")
+
 if __name__ == "__main__":
     print("=== Recursive Splitter Demo ===")
-    recursive_splitter()
+    #recursive_splitter()
+    overlap_importance()
