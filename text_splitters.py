@@ -102,4 +102,4 @@ def overlap_importance():
 if __name__ == "__main__":
     print("=== Recursive Splitter Demo ===")
     #recursive_splitter()
-    overlap_importance()
+    recursive_splitter()
