@@ -5,11 +5,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from dotenv import load_dotenv
+
 
 from fastf1_ingest import get_race_documents
-
-load_dotenv()
+from config import GOOGLE_API_KEY
 
 embeddings_model = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
 llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0.2)

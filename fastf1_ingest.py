@@ -11,7 +11,11 @@ the RAG pipeline.
 """
  
 import fastf1
+import os
 from langchain_core.documents import Document
+
+os.makedirs('./fastf1_cache', exist_ok=True)
+fastf1.Cache.enable_cache('./fastf1_cache')
  
  
 def get_race_results(year: int, race: str) -> list[dict]:
