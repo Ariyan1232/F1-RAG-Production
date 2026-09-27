@@ -1,4 +1,4 @@
-import os
+import time
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -14,6 +14,8 @@ embeddings_model = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
 llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0.2)
 
 PERSIST_DIR = "./chroma_db"
+EMBED_BATCH_SIZE = 90  # stays under the free tier's 100 requests/minute
+EMBED_BATCH_WAIT = 61  # seconds between batches
 
 
 def create_kb(documents):
@@ -22,20 +24,38 @@ def create_kb(documents):
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(documents)
 
-    if os.path.exists(PERSIST_DIR) and os.listdir(PERSIST_DIR):
-        print("Loading existing vector store and adding new documents...")
-        vector_store = Chroma(
-            persist_directory=PERSIST_DIR,
-            embedding_function=embeddings_model,
+    # Deterministic IDs (doc_id + chunk index) make re-ingesting a race an
+    # upsert instead of adding duplicate chunks.
+    chunk_counts = {}
+    ids = []
+    for chunk in chunks:
+        doc_id = chunk.metadata["doc_id"]
+        n = chunk_counts.get(doc_id, 0)
+        chunk_counts[doc_id] = n + 1
+        ids.append(f"{doc_id}#{n}")
+
+    # Creates the store on first run, loads it otherwise.
+    vector_store = Chroma(
+        persist_directory=PERSIST_DIR,
+        embedding_function=embeddings_model,
+    )
+
+    # Only embed chunks that aren't stored yet, so re-runs cost no API quota.
+    existing = set(vector_store.get(ids=ids, include=[])["ids"])
+    new = [(chunk, chunk_id) for chunk, chunk_id in zip(chunks, ids) if chunk_id not in existing]
+    print(f"{len(existing)} chunks already stored, embedding {len(new)} new chunks...")
+
+    # Gemini's free tier allows 100 embedding requests per minute.
+    for start in range(0, len(new), EMBED_BATCH_SIZE):
+        if start > 0:
+            print(f"  waiting {EMBED_BATCH_WAIT}s for the embedding rate limit...")
+            time.sleep(EMBED_BATCH_WAIT)
+        batch = new[start:start + EMBED_BATCH_SIZE]
+        vector_store.add_documents(
+            [chunk for chunk, _ in batch],
+            ids=[chunk_id for _, chunk_id in batch],
         )
-        vector_store.add_documents(chunks)
-    else:
-        print("Creating new vector store...")
-        vector_store = Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings_model,
-            persist_directory=PERSIST_DIR,
-        )
+        print(f"  embedded {start + len(batch)}/{len(new)}")
 
     return vector_store
 
