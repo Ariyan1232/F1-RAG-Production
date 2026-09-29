@@ -119,3 +119,51 @@ ensemble_retriever = EnsembleRetriever(
 )
 
 print("Ensemble retriever created.")
+
+# This is what EnsembleRetriever did internally
+def hybrid_retriever(query, retrievers, weights, k=3, rrf_k=60):
+    """Combine multiple retrievers using weighted Reciprocal Rank Fusion."""
+    doc_scores = {}  # page_content -> (score, doc)
+
+    for retriever, weight in zip(retrievers, weights):
+        results = retriever.invoke(query)
+        for rank, doc in enumerate(results):
+            key = doc.page_content
+            rrf_score = weight * (1.0 / (rank + rrf_k))
+            if key in doc_scores:
+                doc_scores[key] = (doc_scores[key][0] + rrf_score, doc)
+            else:
+                doc_scores[key] = (rrf_score, doc)
+
+    sorted_docs = sorted(doc_scores.values(), key=lambda x: x[0], reverse=True)
+    return [doc for _, doc in sorted_docs[:k]]
+
+def test_query(query, name, retriever):
+    '''Test a query for results'''
+    results = retriever.invoke(query)
+    print(f"\n{name} -Query: \'{query}\'")
+    for i, doc in enumerate(results[:3]):
+        preview = doc.page_content[:80] + "..."
+        print(f'  {i+1}: {preview}')
+    return results
+
+test_queries = [
+    "Who won the 2023 Monaco Grand Prix?",
+    "What happened on lap 17 of the 2023 Monaco Grand Prix?",
+    "Which drivers pitted under the Safety Car in the 2023 Australia Grand Prix?",
+]
+
+for query in test_queries:
+
+    print('=' * 60)
+
+    vector_results = test_query(query, "VECTOR", vector_retriever)
+
+    bm25_results = test_query(query, "BM25", BM25_retriever)
+
+    hybrid_results = test_query(query, "HYBRID", ensemble_retriever)
+
+    custom_results = hybrid_retriever(query, [vector_retriever, BM25_retriever], [0.5, 0.5])
+    print(f"\nCUSTOM HYBRID -Query: '{query}'")
+    for i, doc in enumerate(custom_results):
+        print(f"  {i+1}: {doc.page_content[:80]}...")
