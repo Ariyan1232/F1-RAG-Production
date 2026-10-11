@@ -946,6 +946,7 @@ def get_race_telemetry(session, session_type="R"):
             "race_control_messages": formatted_rc_messages,
             "total_laps": int(max_lap_number),
             "max_tyre_life": max_tyre_life_map,
+            "t0_offset": float(global_t_min),  # session time (s) of frame t=0
         }, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Saved Successfully!")
@@ -957,6 +958,7 @@ def get_race_telemetry(session, session_type="R"):
         "race_control_messages": formatted_rc_messages,
         "total_laps": int(max_lap_number),
         "max_tyre_life": max_tyre_life_map,
+        "t0_offset": float(global_t_min),  # session time (s) of frame t=0
     }
 
 
